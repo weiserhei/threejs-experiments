@@ -28,8 +28,8 @@ loader.load( 'fonts/gentilis_regular.typeface.js', function ( font ) {
 
 function init( font ) {
 
-	var width  = window.innerWidth;
-	var height = window.innerHeight;
+    var width  = window.innerWidth;
+    var height = window.innerHeight;
 
     scene = new THREE.Scene();
 
@@ -43,15 +43,15 @@ function init( font ) {
     document.body.appendChild(renderer.domElement);
 
     stats = new Stats();
-    stats.domElement.style = "position:absolute; bottom:0; left:55%;";
+    stats.domElement.style = "position:absolute; bottom:0; left:35%;";
     document.body.appendChild( stats.domElement );
 
     stats2 = new Stats();
-    stats2.domElement.style = "position:absolute; bottom:0; left:45%";
+    stats2.domElement.style = "position:absolute; bottom:0; left:51%";
     document.body.appendChild( stats2.domElement );
 
     stats3 = new Stats();
-    stats3.domElement.style = "position:absolute; bottom:0; left:65%";
+    stats3.domElement.style = "position:absolute; bottom:0; left:67%";
     document.body.appendChild( stats3.domElement );
 
     function addLabel( name, location ) {
@@ -83,41 +83,33 @@ function init( font ) {
     addLabel( limitedFPS + " FPS", new THREE.Vector3( xposition + offset * 1, 0, 0 ) );
     addLabel( "Random FPS", new THREE.Vector3( xposition + offset * 2, 0, 0 ) );
 
-    function createBox( message ) {
-
-	    var box = document.createElement("p");
-	    box.style = "display:inline-block; width:33%; text-align:center";
-	    container.appendChild( box );
-	    box.innerHTML = message;
-    }
-
     var group = new THREE.Group;
 
-    // fixed 30
-    cube = spinCube();
-    cube.position.set( xposition + offset * 1, -400, 0 )
-
-    // delta 30
-    cube2 = spinCube();
-    cube2.position.set( xposition + offset * 1, -0, 0 );
-
     // delta 60
-    cube3 = spinCube();
-    cube3.position.set( xposition + offset * 0, -0, 0 );
+    cube1 = spinCube();
+    cube1.position.set( xposition + offset * 0, -0, 0 );
 
     // fixed 60
-    cube4 = spinCube();
-    cube4.position.set( xposition + offset * 0, -400, 0 );
+    cube2 = spinCube();
+    cube2.position.set( xposition + offset * 0, -400, 0 );
 
-    // fixed random
-    cube5 = spinCube();
-    cube5.position.set( xposition + offset * 2, -400, 0 );
+    // delta 30
+    cube3 = spinCube();
+    cube3.position.set( xposition + offset * 1, -0, 0 );
+
+    // fixed 30
+    cube4 = spinCube();
+    cube4.position.set( xposition + offset * 1, -400, 0 )
 
     // delta random
-    cube6 = spinCube();
-    cube6.position.set( xposition + offset * 2, 0, 0 );
+    cube5 = spinCube();
+    cube5.position.set( xposition + offset * 2, 0, 0 );
 
-    group.add( cube, cube2, cube3, cube4, cube5, cube6 );
+    // fixed random
+    cube6 = spinCube();
+    cube6.position.set( xposition + offset * 2, -400, 0 );
+
+    group.add( cube1, cube2, cube3, cube4, cube5, cube6 );
     group.position.set( 50, 200, 0 );
     scene.add( group );
 
@@ -161,9 +153,9 @@ function animate() {
     // call animation with limited framerate
     if ( timeBuffer >= 1 / ( limitedFPS + 1 ) ) {
 
-        cube.userData.spin( fixedStep );
-        cube2.userData.spin( timeBuffer );
-        stats.update();
+        cube3.userData.spin( timeBuffer );
+        cube4.userData.spin( fixedStep );
+        stats2.update();
         timeBuffer = 0;
 
     }
@@ -171,8 +163,8 @@ function animate() {
     // call animation with random framerate
     if ( randomBuffer > 1 / variableFrameRate ) {
 
-        cube5.userData.spin( fixedStep );
-        cube6.userData.spin( randomBuffer );
+        cube5.userData.spin( randomBuffer );
+        cube6.userData.spin( fixedStep );
         stats3.update();
         randomBuffer = 0;
         variableFrameRate = randomIntFromInterval( 1, 60 ) * 3;
@@ -180,9 +172,9 @@ function animate() {
     }
 
     // call animation every frame
-    cube3.userData.spin( delta );
-    cube4.userData.spin( fixedStep );
-	stats2.update();
+    cube1.userData.spin( delta );
+    cube2.userData.spin( fixedStep );
+	stats.update();
 
     renderer.render(scene, camera);
     requestAnimationFrame( animate );
