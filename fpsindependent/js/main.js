@@ -1,3 +1,9 @@
+/**
+ * Demo to show the importance of
+ * Framerate-Independent animation
+ *
+ */
+
 var scene, camera, renderer;
 var cube, cube2, cube3, cube4, cube5, cube6;
 var stats, stats2, stats3;
