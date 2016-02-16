@@ -5,14 +5,18 @@
  */
 
 var scene, camera, renderer;
-var cube, cube2, cube3, cube4, cube5, cube6;
-var stats, stats2, stats3;
+var cube, cube2, cube3, cube4, cube5, cube6, cube7, cube8;
+var stats, stats2, stats3, stats4;
 
 var clock = new THREE.Clock();
 var fixedStep = 1/60;
 var limitedFPS = 30;
 var timeBuffer = 0;
 var randomBuffer = 0;
+
+var workerDelta = 0;
+var workerBusy = false; //used to manually sync
+var transferBuffer = new Float32Array( 6 );
 
 var mT = new MersenneTwister();
 var variableFrameRate = randomIntFromInterval( 1, 60 );
@@ -31,8 +35,48 @@ loader.load( 'fonts/gentilis_regular.typeface.js', function ( font ) {
 
 } );
 
+if (window.Worker) {
+
+    var myWorker = new Worker("js/worker.js");
+
+    myWorker.onmessage = function ( e ) { 
+
+        // console.log("e", e );
+        if ( e.data instanceof ArrayBuffer ) { 
+            // byteLength === 1 is the worker making a SUPPORT_TRANSFERABLE test
+            var data = new Float32Array( e.data );
+            // console.log( "data", data );
+        }
+
+        stats4.update();
+        cube7.rotation.set( data[1], data[2], data[3] );
+        cube8.userData.spin( data[4] );
+        workerBusy = false;
+        // console.log("worker finish");
+
+    };
+
+    myWorker.onerror = function( event ) {
+        throw event.data;
+    };
+
+} else {
+    alert("no worker support");
+}
 
 function init( font ) {
+
+    // GUI
+    var gui = new dat.GUI();
+    var folder = gui.addFolder( "Worker Fake Load");
+    folder.open();
+    var guiOptions = {
+        fibonacci: 0
+    }
+    folder.add( guiOptions, "fibonacci" )
+        .min( 0 ).max( 50 )
+        .onChange( function() { transferBuffer[5] = guiOptions.fibonacci; } );
+
 
     var width  = window.innerWidth;
     var height = window.innerHeight;
@@ -49,22 +93,25 @@ function init( font ) {
     document.body.appendChild(renderer.domElement);
 
     stats = new Stats();
-    stats.domElement.style = "position:absolute; bottom:0; left:35%;";
+    stats.domElement.style = "position:absolute; bottom:0; left:40%;";
     document.body.appendChild( stats.domElement );
 
     stats2 = new Stats();
-    stats2.domElement.style = "position:absolute; bottom:0; left:51%";
+    stats2.domElement.style = "position:absolute; bottom:0; left:55%";
     document.body.appendChild( stats2.domElement );
 
     stats3 = new Stats();
-    stats3.domElement.style = "position:absolute; bottom:0; left:67%";
+    stats3.domElement.style = "position:absolute; bottom:0; left:71%";
     document.body.appendChild( stats3.domElement );
+
+    stats4 = new Stats();
+    stats4.domElement.style = "position:absolute; bottom:0; left:25%";
+    document.body.appendChild( stats4.domElement );
 
     function addLabel( name, location ) {
         var textGeo = new THREE.TextGeometry( name, {
 
             font: font,
-
             size: 20,
             height: 1,
             curveSegments: 1
@@ -77,19 +124,29 @@ function init( font ) {
         scene.add( textMesh );
     }
 
-    addLabel( "Fixed Step", new THREE.Vector3( -500, 0, 0 ) );
-    addLabel( "Delta Step", new THREE.Vector3( -500, 350, 0 ) );
+    addLabel( "Fixed Step", new THREE.Vector3( -700, 0, 0 ) );
+    addLabel( "Delta Step", new THREE.Vector3( -700, 350, 0 ) );
 
-    var xposition = -300;
+    var xposition = -200;
     var offset = 300;
+    addLabel( "Worker", new THREE.Vector3( xposition + offset * -1, 350, 0 ) );
     addLabel( "60 FPS", new THREE.Vector3( xposition + offset * 0, 350, 0 ) );
     addLabel( limitedFPS +" FPS", new THREE.Vector3( xposition + offset * 1, 350, 0 ) );
     addLabel( "Random FPS", new THREE.Vector3( xposition + offset * 2, 350, 0 ) );
+    addLabel( "Worker", new THREE.Vector3( xposition + offset * -1, 0, 0 ) );
     addLabel( "60 FPS", new THREE.Vector3( xposition + offset * 0, 0, 0 ) );
     addLabel( limitedFPS + " FPS", new THREE.Vector3( xposition + offset * 1, 0, 0 ) );
     addLabel( "Random FPS", new THREE.Vector3( xposition + offset * 2, 0, 0 ) );
 
     var group = new THREE.Group;
+
+    // worker delta
+    cube7 = spinCube();
+    cube7.position.set( xposition + offset * -1, -0, 0 );
+
+    // fixed worker
+    cube8 = spinCube();
+    cube8.position.set( xposition + offset * -1, -400, 0 );
 
     // delta 60
     cube1 = spinCube();
@@ -115,7 +172,7 @@ function init( font ) {
     cube6 = spinCube();
     cube6.position.set( xposition + offset * 2, -400, 0 );
 
-    group.add( cube1, cube2, cube3, cube4, cube5, cube6 );
+    group.add( cube1, cube2, cube3, cube4, cube5, cube6, cube7, cube8 );
     group.position.set( 50, 200, 0 );
     scene.add( group );
 
@@ -150,11 +207,42 @@ function spinCube( pos ) {
     return mesh;
 }
 
+function fibonacci(n) {
+   if (n < 2)
+      return 1;
+   else
+      return fibonacci(n-2) + fibonacci(n-1);
+}
+
 function animate() {
 
     var delta = clock.getDelta();
     timeBuffer += delta;
     randomBuffer += delta;
+
+    // call animation every frame
+    cube1.userData.spin( delta );
+    cube2.userData.spin( fixedStep );
+    stats.update();
+
+    // fibonacci( 35 );
+    workerDelta += delta;
+
+    if ( ! workerBusy ) {
+        // console.log("workerDelta", workerDelta );
+
+        transferBuffer[0] = workerDelta;
+        transferBuffer[1] = cube7.rotation.x;
+        transferBuffer[2] = cube7.rotation.y;
+        transferBuffer[3] = cube7.rotation.z;
+
+        transferBuffer[4] = fixedStep;
+
+        myWorker.postMessage( transferBuffer.buffer );
+
+        workerBusy = true;
+        workerDelta = 0;
+    }
 
     // call animation with limited framerate
     if ( timeBuffer >= 1 / ( limitedFPS + 1 ) ) {
@@ -176,11 +264,6 @@ function animate() {
         variableFrameRate = randomIntFromInterval( 1, 60 ) * 3;
 
     }
-
-    // call animation every frame
-    cube1.userData.spin( delta );
-    cube2.userData.spin( fixedStep );
-	stats.update();
 
     renderer.render(scene, camera);
     requestAnimationFrame( animate );
