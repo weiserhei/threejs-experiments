@@ -9,11 +9,22 @@ var cube, cube2, cube3, cube4, cube5, cube6, cube7, cube8;
 var stats, stats2, stats3, stats4;
 
 var clock = new THREE.Clock();
-var fixedStep = 1/60;
+var fixedStep = 60;
 var limitedFPS = 30;
 var timeBuffer = 0;
 var randomBuffer = 0;
 
+// cap rendering
+var fpsInterval = 1000 / fixedStep;
+var lastUpdate = 0;
+var elapsedTime = 0;
+
+// cap rendering 2
+var elapsed30 = 0;
+var limit30 = 1000 / limitedFPS;
+var lastUpdate30 = 0;
+
+// WORKER VARIABLES
 var workerDelta = 0;
 var workerBusy = false; //used to manually sync
 var transferBuffer = new Float32Array( 6 );
@@ -31,7 +42,7 @@ var loader = new THREE.FontLoader();
 loader.load( 'fonts/gentilis_regular.typeface.js', function ( font ) {
 
     init( font );
-    animate();
+    raf();
 
 } );
 
@@ -72,7 +83,8 @@ function init( font ) {
     folder.open();
     var guiOptions = {
         fibonacci: 0,
-        fixedStep: 60
+        fixedStep: 60,
+        fpsCap: 60,
     }
     folder.add( guiOptions, "fibonacci" )
         .min( 0 ).max( 50 )
@@ -80,7 +92,11 @@ function init( font ) {
 
     folder.add( guiOptions, "fixedStep" )
         .min( 1 ).max( 144 )
-        .onChange( function() { fixedStep = 1 / guiOptions.fixedStep; } );
+        .onChange( function() { fixedStep = guiOptions.fixedStep; } );
+
+    folder.add( guiOptions, "fpsCap" )
+        .min( 1 ).max( 144 )
+        .onChange( function() { fpsInterval = 1000 / guiOptions.fpsCap; } );
 
 
     var width  = window.innerWidth;
@@ -219,43 +235,55 @@ function fibonacci(n) {
       return fibonacci(n-2) + fibonacci(n-1);
 }
 
-function animate() {
+function raf( time ) {
+
+	elapsedTime = time - lastUpdate;
+	elapsed30 = time - lastUpdate30;
+
+	// cap rendering at 60 FPS
+	if ( elapsedTime > fpsInterval ) {
+
+	    animate( time );
+		renderer.render(scene, camera);
+
+    }
+
+    requestAnimationFrame( raf );
+}
+
+function animate( time ) {
+
+    // Get ready for next frame by setting then=now, but also adjust for your
+    // specified fpsInterval not being a multiple of RAF's interval (16.7ms)
+    lastUpdate = time - ( elapsedTime % fpsInterval );
 
     var delta = clock.getDelta();
-    timeBuffer += delta;
     randomBuffer += delta;
+    workerDelta += delta;
+
+    // fibonacci( 35 );
 
     // call animation every frame
     cube1.userData.spin( delta );
-    cube2.userData.spin( fixedStep );
+    cube2.userData.spin( 1/fixedStep );
     stats.update();
 
-    // fibonacci( 35 );
-    workerDelta += delta;
-
+    // call worker when ready
     if ( ! workerBusy ) {
-        // console.log("workerDelta", workerDelta );
-
-        transferBuffer[0] = workerDelta;
-        transferBuffer[1] = cube7.rotation.x;
-        transferBuffer[2] = cube7.rotation.y;
-        transferBuffer[3] = cube7.rotation.z;
-
-        transferBuffer[4] = fixedStep;
-
-        myWorker.postMessage( transferBuffer.buffer );
-
+		runWorker( workerDelta, 1/fixedStep );
         workerBusy = true;
+        // reset Worker time buffer
         workerDelta = 0;
     }
 
+    timeBuffer += delta;
     // call animation with limited framerate
-    if ( timeBuffer >= 1 / ( limitedFPS + 1 ) ) {
+    if ( elapsed30 > limit30 ) {
 
-        cube3.userData.spin( timeBuffer );
-        cube4.userData.spin( fixedStep );
-        stats2.update();
-        timeBuffer = 0;
+		lastUpdate30 = time - (elapsed30 % limit30);
+    	cap30( timeBuffer, 1/fixedStep );
+    	// reset time buffer
+    	timeBuffer = 0;
 
     }
 
@@ -263,13 +291,33 @@ function animate() {
     if ( randomBuffer > 1 / variableFrameRate ) {
 
         cube5.userData.spin( randomBuffer );
-        cube6.userData.spin( fixedStep );
+        cube6.userData.spin( 1/fixedStep );
         stats3.update();
         randomBuffer = 0;
         variableFrameRate = randomIntFromInterval( 1, 60 ) * 3;
 
     }
+}
 
-    renderer.render(scene, camera);
-    requestAnimationFrame( animate );
+function cap30 ( delta, fixed ) {
+
+    cube3.userData.spin( delta );
+    cube4.userData.spin( fixed );
+    stats2.update();
+
+}
+
+function runWorker( delta, fixed ) {
+
+    // console.log("workerDelta", delta );
+
+    transferBuffer[0] = delta;
+    transferBuffer[1] = cube7.rotation.x;
+    transferBuffer[2] = cube7.rotation.y;
+    transferBuffer[3] = cube7.rotation.z;
+
+    transferBuffer[4] = fixed;
+
+    myWorker.postMessage( transferBuffer.buffer );
+
 }
