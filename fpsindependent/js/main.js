@@ -71,11 +71,16 @@ function init( font ) {
     var folder = gui.addFolder( "Worker Fake Load");
     folder.open();
     var guiOptions = {
-        fibonacci: 0
+        fibonacci: 0,
+        fixedStep: 60
     }
     folder.add( guiOptions, "fibonacci" )
         .min( 0 ).max( 50 )
-        .onChange( function() { transferBuffer[5] = guiOptions.fibonacci; } );
+        .onChange( function() { transferBuffer[5] = guiOptions.fibonacci; } );    
+
+    folder.add( guiOptions, "fixedStep" )
+        .min( 1 ).max( 144 )
+        .onChange( function() { fixedStep = 1 / guiOptions.fixedStep; } );
 
 
     var width  = window.innerWidth;
