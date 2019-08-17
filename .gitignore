@@ -3,7 +3,7 @@
 *.sublime-workspace
 *.psd
 */threecap*
-#node_modules/
+node_modules/
 
 # Compiled source #
 ###################
